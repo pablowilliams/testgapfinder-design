@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TestGapFinder — Coverage gap analyser</title>
+    <meta
+      name="description"
+      content="Upload a Cobertura coverage.xml and receive a test-debt score, a ranked list of under-tested files, and heuristic property descriptions of the uncovered spans. Runs entirely in your browser."
+    />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to coverage analyser</a>
+
+    <header class="site-header">
+      <div class="site-header__inner">
+        <h1 class="site-title">
+          <span class="site-title__mark">TestGapFinder</span>
+        </h1>
+        <p class="site-tagline">Cobertura coverage.xml analyser</p>
+        <button
+          id="theme-toggle"
+          class="theme-toggle"
+          type="button"
+          aria-pressed="false"
+          aria-label="Toggle dark mode"
+        >
+          <span class="theme-toggle__label" aria-hidden="true">Dark mode</span>
+        </button>
+      </div>
+    </header>
+
+    <section class="hero" aria-labelledby="hero-h">
+      <div class="hero__inner">
+        <span class="hero__eyebrow">TestGapFinder · Design Prototype</span>
+        <h2 id="hero-h" class="hero__title">
+          Turn your coverage report into a triage queue.
+        </h2>
+        <p class="hero__lede">
+          Upload a Cobertura <code>coverage.xml</code> and receive a test-debt
+          score, a ranked list of under-tested files, and heuristic descriptions
+          of the uncovered spans. Analysis is deterministic and runs entirely
+          in your browser.
+        </p>
+      </div>
+    </section>
+
+    <main
+      id="main"
+      class="site-main"
+      aria-label="Coverage gap analyser"
+      tabindex="-1"
+    >
+      <section class="panel upload-panel" aria-labelledby="upload-h">
+        <h2 id="upload-h">Upload a coverage report</h2>
+        <p class="lede">
+          The demo accepts the Cobertura XML emitted by
+          <a href="https://coverage.readthedocs.io" rel="noopener">coverage.py</a>
+          and
+          <a href="https://pytest-cov.readthedocs.io" rel="noopener">pytest-cov</a>
+          (run <code>coverage xml</code> or
+          <code>pytest --cov-report=xml</code>). Nothing leaves this page.
+        </p>
+
+        <div class="upload-row">
+          <label for="coverage-file" class="button upload-file-label">
+            <span class="upload-file-label__text">Choose coverage.xml</span>
+            <span class="upload-file-label__detail" id="file-picker-detail"
+              >or drop a file anywhere on this area</span
+            >
+            <input
+              id="coverage-file"
+              class="upload-file"
+              type="file"
+              accept=".xml,application/xml,text/xml"
+              aria-describedby="file-hint"
+            />
+          </label>
+          <span id="file-hint" class="upload-hint">
+            Cobertura XML from coverage.py or pytest-cov. Max 10 MB. No data is
+            sent to a server.
+          </span>
+          <div id="drop-zone" class="drop-zone" aria-hidden="true"></div>
+        </div>
+
+        <details class="upload-advanced">
+          <summary>Paste XML instead (for small examples)</summary>
+          <div class="upload-advanced__body">
+            <label for="xml-input" class="upload-label"
+              >Paste Cobertura XML</label
+            >
+            <textarea
+              id="xml-input"
+              class="xml-input"
+              rows="6"
+              spellcheck="false"
+              wrap="off"
+              placeholder="<?xml version=&quot;1.0&quot; ?>&#10;<coverage line-rate=&quot;0.72&quot;>&#10;  ...&#10;</coverage>"
+            ></textarea>
+            <button id="analyse-paste-btn" class="button button--ghost" type="button">
+              Analyse pasted XML
+            </button>
+          </div>
+        </details>
+
+        <div class="upload-actions">
+          <button
+            id="reset-btn"
+            class="button button--ghost"
+            type="button"
+            hidden
+          >
+            Clear and analyse another
+          </button>
+        </div>
+      </section>
+
+      <div
+        id="status"
+        class="status"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      ></div>
+      <div id="error" class="alert" role="alert" hidden></div>
+
+      <section
+        id="results-section"
+        class="panel results-panel"
+        aria-labelledby="results-h"
+        hidden
+      >
+        <h2 id="results-h" tabindex="-1">Results</h2>
+
+        <div class="score-card" id="score-card">
+          <div class="score-card__ring" aria-hidden="true">
+            <svg viewBox="0 0 120 120">
+              <defs>
+                <linearGradient
+                  id="scoreGradient"
+                  x1="0%"
+                  y1="0%"
+                  x2="100%"
+                  y2="100%"
+                >
+                  <stop offset="0%" stop-color="#2e1065" />
+                  <stop offset="55%" stop-color="#5b21b6" />
+                  <stop offset="100%" stop-color="#7c3aed" />
+                </linearGradient>
+              </defs>
+              <circle
+                class="ring-bg"
+                cx="60"
+                cy="60"
+                r="52"
+                fill="none"
+                stroke-width="10"
+              />
+              <circle
+                id="ring-fg"
+                class="ring-fg"
+                cx="60"
+                cy="60"
+                r="52"
+                fill="none"
+                stroke-width="10"
+                stroke-dasharray="326.73"
+                stroke-dashoffset="326.73"
+              />
+            </svg>
+            <div class="score-card__ring-text">
+              <span class="score-card__number" id="score-number">—</span>
+              <span class="score-card__out-of">% covered</span>
+            </div>
+          </div>
+
+          <div class="score-card__meta">
+            <span class="score-card__label">Coverage grade</span>
+            <p class="score-card__title" id="score-title">Awaiting report</p>
+          </div>
+
+          <div class="grade-badge" id="grade-badge" data-grade="pending">
+            <svg
+              class="grade-badge__glyph"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <circle
+                cx="12"
+                cy="12"
+                r="10"
+                fill="currentColor"
+                opacity="0.18"
+              />
+              <path
+                id="grade-glyph-path"
+                d="M6 12l4 4 8-8"
+                stroke="currentColor"
+                stroke-width="2"
+                fill="none"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            <span class="grade-badge__letter" id="grade-letter">—</span>
+            <span class="grade-badge__word" id="grade-word">Awaiting report</span>
+          </div>
+
+          <p class="score-summary" id="score-summary"></p>
+        </div>
+
+        <span class="sr-only" id="score-sr"></span>
+      </section>
+
+      <section
+        id="findings-section"
+        class="panel findings-panel"
+        aria-labelledby="findings-h"
+        hidden
+      >
+        <h2 id="findings-h">Ranked test debt</h2>
+        <p class="findings-intro">
+          Files are ranked by a test-debt score that combines uncovered-line
+          count, longest uncovered span, and a path-based severity hint
+          (<code>billing</code>, <code>payment</code>, <code>auth</code> paths
+          rank higher than <code>utils</code>, <code>logging</code>).
+          <strong>This demo uses the coverage file only.</strong> The full
+          pipeline (see
+          <a href="../TestGapFinder_Design_Report.pdf" rel="noopener">design report</a>)
+          also considers git churn, cyclomatic complexity, and call-graph
+          centrality.
+        </p>
+        <p id="findings-empty" class="findings-empty" hidden></p>
+        <ol id="findings-list" class="findings-list"></ol>
+      </section>
+
+      <section
+        id="prose-section"
+        class="panel prose-panel"
+        aria-labelledby="prose-h"
+        hidden
+      >
+        <h2 id="prose-h">Heuristic descriptions</h2>
+        <p class="prose-disclaimer">
+          These descriptions are generated from line ranges in your coverage
+          file. They are templates, not an analysis of your code — the LLM
+          reasoner described in the design report is not in this demo.
+        </p>
+        <div id="prose-list" class="prose-list"></div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>
+        TestGapFinder is an open-source design project. Analysis runs
+        client-side against the standard Cobertura schema. Coverage data never
+        leaves your browser.
+        <a
+          class="site-footer__link"
+          href="https://github.com/pablowilliams/testgapfinder-design"
+          rel="noopener"
+          >View source on GitHub</a
+        >.
+      </p>
+    </footer>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
